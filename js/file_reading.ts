@@ -97,98 +97,47 @@ var approx_dat_len: number,
     conf_end = new marker,
     conf_len: number,
     dat_fileout: string = "",
-    dat_file; //currently var so only 1 dat_file stored for all systems w/ last uploaded system's dat
+    dat_file, //currently var so only 1 dat_file stored for all systems w/ last uploaded system's dat
+    top_file,
+    json_file;
 
+
+var strand_to_material = {};
+var base_to_material = {};
+var base_to_num = {"A": 0,"G": 1,"C": 2,"T": 3,"U": 3};
+
+// space to store the file objects  
+var top_file,  json_file;
 
 target.addEventListener("drop", function (event) {
+    //make sure the file vars are clear 
+    dat_file  = undefined;
+    top_file  = undefined;
+    json_file = undefined;
 
     // cancel default actions
     event.preventDefault();
-
+    
     //make system to store the dropped files in
     var system = new System(sys_count, nucleotides.length);
 
     var files = event.dataTransfer.files,
         files_len = files.length;
 
-    var strand_to_material = {};
-    var base_to_material = {};
-    var base_to_num = {
-        "A": 0,
-        "G": 1,
-        "C": 2,
-        "T": 3,
-        "U": 3
-    };
-
-    // get the extention of one of the 2 files 
-    let ext = files[0].name.slice(-3);
-    // space to store the file paths 
-
-    let top_file;
-    let json_file;
     // assign files to the extentions; all possible combinations of entered files
-    if (files_len == 1) {
-        if (ext == "son") {
-            json_file = files[0];
-        }
-        else {
-            alert("please drag and drop a .dat and a .top file  (and .json for flexibility coloring");
-        }
-    }
+    for(let i = 0; i < files_len; i++){
+        // get file extension
+        let file_name = files[i].name;
+        let ext = file_name.split('.').pop();
 
-    if (files_len == 2) {
-        if (ext == "dat" || ext == "onf") {
-            dat_file = files[0];
-            top_file = files[1];
-        }
-        else {
-            dat_file = files[1];
-            top_file = files[0];
-        }
+        if(ext === "dat")   dat_file  = files[i];
+        if(ext === "conf")  dat_file  = files[i];
+        if(ext === "top")   top_file  = files[i];
+        if(ext === "json")  json_file = files[i];        
     }
-    else if (files_len === 3) {
-        let ext1 = files[1].name.slice(-3);
-        if (ext === "dat" || ext == "onf") {
-            if (ext1 == "top") {
-                dat_file = files[0];
-                top_file = files[1];
-                json_file = files[2];
-            }
-            else if (ext1 === "son") {
-                dat_file = files[0];
-                top_file = files[2];
-                json_file = files[1];
-            }
-        }
-        else if (ext === "top") {
-            if (ext1 == "dat" || ext1 == "onf") {
-                dat_file = files[1];
-                top_file = files[0];
-                json_file = files[2];
-            }
-            else if (ext1 === "son") {
-                dat_file = files[2];
-                top_file = files[0];
-                json_file = files[1];
-            }
-        }
-        else {
-            if (ext1 == "dat" || ext1 == "onf") {
-                dat_file = files[1];
-                top_file = files[2];
-                json_file = files[0];
-            }
-            else if (ext1 === "top") {
-                dat_file = files[2];
-                top_file = files[1];
-                json_file = files[0];
-            }
-        }
-    }
-    else if (files_len > 3) (alert("Please drag and drop 1 .dat and 1 .top file. .json is optional.")) //error message
-
-    if (files_len == 2 || files_len == 3) {
+    if (files_len > 3)  alert("Please drag and drop 1 .dat and 1 .top file. .json is optional."); //error message
+    
+    if (top_file) {
         //read topology file
         let top_reader = new FileReader();
         top_reader.onload = () => {
@@ -261,7 +210,7 @@ target.addEventListener("drop", function (event) {
 
                     if (i == lines.length - 1) {
                         system.add_strand(current_strand);
-                        return
+                        return;
                     };
 
                 });
@@ -277,48 +226,13 @@ target.addEventListener("drop", function (event) {
 
         };
         top_reader.readAsText(top_file);
-        //test_dat_read(dat_file);
-
         var show_flex = false;
-        if (files_len == 3) { //if dropped 3 files = also included flexibility coloring .json
-            show_flex = true;
-            let json_reader = new FileReader(); //read .json
-            json_reader.onload = () => {
-                let file = json_reader.result as string;
-                let lines: string[] = file.split(", ");
-                devs = [];
-                if (lines.length == system.system_length()) { //if json and dat files match/same length
-                    for (let i = 0; i < lines.length; i++) {
-                        devs.push(parseFloat(lines[i])); //insert numbers from json file into devs[]
-                    }
-                    let min = Math.min.apply(null, devs), //find min and max
-                        max = Math.max.apply(null, devs);
-                    lut = new THREE.Lut("rainbow", 4000);
-                    lut.setMax(max)
-                    lut.setMin(min);
-                    let legend = lut.setLegendOn({ 'layout': 'horizontal', 'position': { 'x': 0, 'y': 10, 'z': 0 } }); //create legend
-                    scene.add(legend);
-                    let labels = lut.setLegendLabels({ 'title': 'Number', 'um': 'id', 'ticks': 5, 'position': { 'x': 0, 'y': 10, 'z': 0 } }); //set up legend format
-                    scene.add(labels['title']); //add title
-
-                    for (let i = 0; i < Object.keys(labels['ticks']).length; i++) { //add tick marks
-                        scene.add(labels['ticks'][i]);
-                        scene.add(labels['lines'][i]);
-                    }
-                }
-                else { //if json and dat files do not match, display error message and set files_len to 2 (not necessary)
-                    alert(".json and .top files are not compatible.");
-                    files_len = 2;
-                }
-            };
-            json_reader.readAsText(json_file);
-        }
     }
 
     //Lut coloring - colors nucleotides based on flexibility during oxDNA simulation run
     //doesn't work for more than one system
     if (files_len == 1) { //if .json dropped after .dat and .top
-        if (files[0].name.slice(-4) == "json") { //if actually a .json file
+        if (files[0].name.split('.').pop() === "json") { //if actually a .json file
             json_file = files[0];
             let json_reader = new FileReader();
             json_reader.onload = () => {
@@ -396,6 +310,7 @@ target.addEventListener("drop", function (event) {
 let x_bb_last,
     y_bb_last,
     z_bb_last;
+    
 function readDat(num_nuc, dat_reader, strand_to_material, base_to_material, system, show_flex) {
     var nuc_local_id = 0;
     var current_strand = systems[sys_count].strands[0];
@@ -606,21 +521,7 @@ function readDat(num_nuc, dat_reader, strand_to_material, base_to_material, syst
             }
         }
     }
-    /* // reposition center of mass of the system to 0,0,0
-    let cms = new THREE.Vector3(0, 0, 0);
-    let n_nucleotides = system.system_length();
-    let i = system.global_start_id;
-    for (; i < system.global_start_id + n_nucleotides; i++) {
-        cms.add(nucleotides[i].pos);
-    }
-    let mul = 1.0 / n_nucleotides;
-    cms.multiplyScalar(mul);
-    i = system.global_start_id;
-    for (; i < system.global_start_id + n_nucleotides; i++) {
-        nucleotide_3objects[i].position.sub(cms);
-    }
-
-    systems[sys_count].CoM = cms; //because system com may be useful to know */
+   
     scene.add(systems[sys_count].system_3objects); //add system_3objects with strand_3objects with visual_object with Meshes
     sys_count += 1;
 
@@ -631,23 +532,12 @@ function readDat(num_nuc, dat_reader, strand_to_material, base_to_material, syst
     if (actionMode.includes("Drag")) {
         drag();
     }
-    /*  let geometry = new THREE.BoxGeometry(0.5, 0.5, 0.5);
-     let material = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
-     let cube = new THREE.Mesh(geometry, material);
-     cube.position.set(0,0,0);
-     scene.add(cube);
-     backbones.push(cube);
-     cube = new THREE.Mesh(geometry, material);
-     cube.position.set(10,10,10);
-     scene.add(cube);
-     backbones.push(cube); */
-    // update the scene
-    render();
     //updatePos(sys_count - 1); //sets positions of system, strands, and visual objects to be located at their cms - messes up rotation sp recalculation and trajectory
     for (let i = 0; i < nucleotides.length; i++) { //create array of backbone sphere Meshes for base_selector
         backbones.push(nucleotides[i].visual_object.children[BACKBONE]);
     }
-    //render();
+    // update the scene
+    render();
 }
 
 var trajlines;
