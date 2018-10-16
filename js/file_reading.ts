@@ -231,43 +231,31 @@ target.addEventListener("drop", function (event) {
 
     //Lut coloring - colors nucleotides based on flexibility during oxDNA simulation run
     //doesn't work for more than one system
-    if (files_len == 1) { //if .json dropped after .dat and .top
-        if (files[0].name.split('.').pop() === "json") { //if actually a .json file
-            json_file = files[0];
-            let json_reader = new FileReader();
-            json_reader.onload = () => {
-                let file = json_reader.result as string;
-                let lines: string[] = file.split(", "); //read numbers as strings
-                devs = [];
-                if (lines.length == nucleotides.length) {
-                    for (let i = 0; i < lines.length; i++) {
-                        devs.push(parseFloat(lines[i])); //insert lines[i] strings as numbers into devs[]
-                    }
-                    let min = Math.min.apply(null, devs), //set min and max
-                        max = Math.max.apply(null, devs);
-                    lut = new THREE.Lut("rainbow", 4000); //create Lut obj
-                    lut.setMax(max)
-                    lut.setMin(min);
-                    let legend = lut.setLegendOn({ 'layout': 'horizontal', 'position': { 'x': 0, 'y': 10, 'z': 0 } }); //create and add legend
-                    scene.add(legend);
-                    let labels = lut.setLegendLabels({ 'title': 'Number', 'um': 'id', 'ticks': 5, 'position': { 'x': 0, 'y': 10, 'z': 0 } }); //create legend formatting
-                    scene.add(labels['title']); //add title
-
-                    for (let i = 0; i < Object.keys(labels['ticks']).length; i++) { //add tick marks
-                        scene.add(labels['ticks'][i]);
-                        scene.add(labels['lines'][i]);
-                    }
-                    for (let i = 0; i < nucleotides.length; i++) { //insert lut colors into lutCols[] to toggle Lut coloring later
-                        lutCols.push(lut.getColor(devs[i]));
-                    }
-                    render();
-                }
-                else {
-                    alert(".json and .top files are not compatible."); //error message if dat_file does not match/same length as .json file
-                }
-            };
-            json_reader.readAsText(json_file);
-        }
+    if (json_file) { //if actually a .json file
+        let json_reader = new FileReader();
+        json_reader.onload = () => {
+            let file = json_reader.result as string;
+            devs = JSON.parse(file);
+            let min = Math.min.apply(null, devs), //set min and max
+                max = Math.max.apply(null, devs);
+            lut = new THREE.Lut("rainbow", 4000); //create Lut obj
+            lut.setMax(max)
+            lut.setMin(min);
+            let legend = lut.setLegendOn({ 'layout': 'horizontal', 'position': { 'x': 0, 'y': 10, 'z': 0 } }); //create and add legend
+            scene.add(legend);
+            let labels = lut.setLegendLabels({ 'title': 'Number', 'um': 'id', 'ticks': 5, 'position': { 'x': 0, 'y': 10, 'z': 0 } }); //create legend formatting
+            scene.add(labels['title']); //add title
+                
+            for (let i = 0; i < Object.keys(labels['ticks']).length; i++) { //add tick marks
+                scene.add(labels['ticks'][i]);
+                scene.add(labels['lines'][i]);
+            }
+            for (let i = 0; i < nucleotides.length; i++) { //insert lut colors into lutCols[] to toggle Lut coloring later
+                lutCols.push(lut.getColor(devs[i]));
+            }
+            render();
+        };
+        json_reader.readAsText(json_file);
     }
 
     // asynchronously read the first two chunks of a configuration file
